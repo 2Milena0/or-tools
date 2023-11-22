@@ -1,0 +1,109 @@
+!pip install --upgrade pip
+!pip install --upgrade ortools
+
+
+
+
+from ortools.linear_solver import pywraplp
+
+def resolver_mdvrp():
+    # Crea el modelo
+    solver = pywraplp.Solver.CreateSolver('SCIP_MIXED_INTEGER_PROGRAMMING')
+
+
+  # Supongamos que tienes 3 depósitos, 7 clientes y 3 vehículos por depósito
+    n_clientes = 7
+    num_depositos = 3
+    num_vehiculos = 9
+    num_vehiculos_por_deposito = 3
+
+    solver = pywraplp.Solver.CreateSolver('SCIP')
+
+
+    # Datos específicos (ajusta según sea necesario)
+
+      # Variables
+    X_asi = {}
+    Y_yo = {}
+    S_asi = {}
+
+    #Definicion de capacidades de vehiculos
+    capacidades_vehiculos = {
+        1: (25, 35),
+        2: (30, 40),
+        3: (20, 30),
+    }
+    # Definicion de demandas de clientes
+    D_i = [solver.IntVar(5, 15, f'D_{i}') for i in range(1, n_clientes + 1)]
+
+
+    distancias_entre_ciudades = [[0, 400, 800, 600, 300, 900, 200, 700, 500, 100],
+                                 [400, 0, 600, 400, 500, 700, 500, 300, 300, 300],
+                                 [800, 600, 0, 200, 700, 400, 800, 400, 500, 700],
+                                 [600, 400, 200, 0, 500, 600, 400, 300, 100, 500],
+                                 [300, 500, 700, 500, 0, 800, 1000, 200, 400, 300],
+                                 [900, 700, 400, 600, 800, 0, 1100, 500, 600, 800],
+                                 [200, 500, 800, 400, 1000, 1100, 0, 900, 700, 400],
+                                 [700, 300, 400, 300, 200, 500, 900, 0, 200, 600],
+                                 [500, 300, 500, 100, 400, 600, 700, 200, 0, 500],
+                                 [100, 300, 700, 500, 300, 800, 400, 600, 500, 0]
+                                ]
+
+
+
+    # Definición de ventanas de tiempo
+    Inicio_i = {i: 8 * 60 for i in range(1, n_clientes + 1)}
+    Aleta_i = {i: 10 * 60 for i in range(1, n_clientes + 1)}
+    # Definición de servicios especiales
+    clientes_con_servicio_especial = {4, 7}
+    
+
+
+    for i in range(1, n_clientes + 1):
+        for k in range(1, num_vehiculos + 1):
+            Y_yo[i, k] = solver.BoolVar(f'Y_{i}_{k}')
+            S_asi[i, k] = solver.BoolVar(f'S_{i}_{k}')
+
+        for j in range(1, n_clientes + 1):
+            X_asi[i, j, k] = solver.BoolVar(f'X_{i}_{j}_{k}')
+
+
+    # Función Objetivo
+    objetivo = solver.Objective()
+    for i in range(n_clientes):
+     for j in range(n_clientes):
+        for k in range(num_vehiculos_por_deposito * num_depositos):
+            if i < len(distancias_entre_ciudades) and j < len(distancias_entre_ciudades[i]):
+                try:
+                    print(f"Valores de i, j, k:", i, j, k)
+                    print("X_asi[i, j, k]:", X_asi.get((i, j, k), 'No existe'))
+                    print("distancias_entre_ciudades[i][j]:", distancias_entre_ciudades[i][j])
+                    objetivo.SetCoefficient(X_asi.get((i, j, k), 0), distancias_entre_ciudades[i][j])
+                except KeyError:
+                    print(f"KeyError: No se encontró la clave ({i}, {j}, {k}) en X_asi")
+            else:
+                print(f"Índices fuera de rango: ({i}, {j})")
+
+    # Restricciones
+    # (Ajusta las restricciones según tus necesidades)
+     for k in range(num_vehiculos):
+        solver.Add(solver.Sum(D_i[i - 1] * Y_yo[i, k] for i in range(1, n_clientes + 1)) <= capacidades_vehiculos[(k - 1) // num_vehiculos_por_deposito + 1][1])
+
+
+
+    # Resolver el modelo
+    solver.Solve()
+
+    # Imprimir resultados
+    if solver.StatusName() == 'OPTIMAL':
+        print('Solución Óptima Encontrada:')
+        for i in range(n_clientes):
+            for j in range(n_clientes):
+                for k in range(num_vehiculos_por_deposito * num_depositos):
+                    if X_asi[i, j, k].solution_value() > 0.5:
+                        print(f'Vehículo {k} va de Cliente {i} a Cliente {j}')
+    else:
+        print('No se encontró una solución óptima.')
+
+if __name__ == '__main__':
+    resolver_mdvrp()
